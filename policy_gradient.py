@@ -1,140 +1,190 @@
+import gym
+import random
 import torch
 import torch.nn as nn
-
-from torch.distributions import Bernoulli
-from torch.autograd import Variable
-from itertools import count
-import matplotlib.pyplot as plt
 import numpy as np
-import gym
-import pdb
+
+from tqdm import tqdm
 
 
-class PolicyNet(nn.Module):
+
+def strategy_raw(status):
+    action=random.choice((0,1))
+    return action
+
+
+class NN(nn.Module):
+    
     def __init__(self):
-        super(PolicyNet, self).__init__()
+        super().__init__()
+        self.fc1= nn.Linear(4, 36)
+        # self.fc2= nn.Linear(36, 36)
+        self.fc3= nn.Linear(36, 1)
+    def forward(self,x):
+        out=self.fc1(x)
+        # out=self.fc2(out)
+        out=self.fc3(out)
+        out=torch.sigmoid(out)
+        return out
+   
 
-        self.fc1 = nn.Linear(4, 24)
-        self.fc2 = nn.Linear(24, 36)
-        self.fc3 = nn.Linear(36, 1)  # Prob of Left
+def accumulate(s,reward):
+    result=0
+    for i in range(0,len(reward)-s):
 
-    def forward(self, x):
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
-        x = torch.sigmoid(self.fc3(x))
-        return x
+        result+=reward[i]*pow(0.9,i)
+    return result
 
-
-if True:
-
-    # Plot duration curve: 
-    # From http://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
-    episode_durations = []
-    def plot_durations():
-        plt.figure(2)
-        plt.clf()
-        durations_t = torch.FloatTensor(episode_durations)
-        plt.title('Training...')
-        plt.xlabel('Episode')
-        plt.ylabel('Duration')
-        plt.plot(durations_t.numpy())
-        # Take 100 episode averages and plot them too
-        if len(durations_t) >= 100:
-            means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
-            means = torch.cat((torch.zeros(99), means))
-            plt.plot(means.numpy())
-
-        plt.pause(0.001)  # pause a bit so that plots are updated
-
-    # Parameters
-    num_episode = 5000
-    batch_size = 5
-    learning_rate = 0.01
-    gamma = 0.99
-
-    env = gym.make('CartPole-v0')
-    policy_net = PolicyNet()
-    optimizer = torch.optim.RMSprop(policy_net.parameters(), lr=learning_rate)
-
-    # Batch History
-    state_pool = []
-    action_pool = []
-    reward_pool = []
-    steps = 0
+def gen_reward(reward):  
+     n_reward=[]
+     for i in range(len(reward)):
+         n_reward.append(accumulate(i,reward))
+     return n_reward
 
 
-    for e in range(num_episode):
+     
+model=NN()       
+        
 
-        state = env.reset()
-        state = torch.from_numpy(state).float()
-        state = Variable(state)
-        env.render(mode='rgb_array')
+env = gym.make('CartPole-v0')
+env._max_episode_steps = 500
+status = env.reset()
 
-        for t in count():
+count=0
 
-            probs = policy_net(state)
-            m = Bernoulli(probs)
-            action = m.sample()
+action_set=[]
+reward_set=[]
+status_set=[]
+discount=0.9
 
-            action = action.data.numpy().astype(int)[0]
-            next_state, reward, done, _ = env.step(action)
-            env.render(mode='rgb_array')
+print('collecting data')
+for i in tqdm(range(500)):
+    status = env.reset()  
+    raw_reward_set=[]
+    done=False
+    while not done:
+        status_set.append(status)
+    
+    
+    
+        count+=1
+        # env.render()
+        action=strategy_raw(status)
+    
+        action_set.append(action)
+        status,reward,done,_=env.step(action)
+    
+    # if done:
+    #     reward=0
+    
+        raw_reward_set.append(reward)
+    
+    # print(model(torch.tensor(status).to(torch.float32)))
+    raw_reward_set=gen_reward(raw_reward_set)
+    reward_set.extend(raw_reward_set)
+device=torch.device('cuda:0')
 
-            # To mark boundarys between episodes
-            if done:
-                reward = 0
+actions=torch.tensor(action_set).to(torch.float32).to(device)
 
-            state_pool.append(state)
-            action_pool.append(float(action))
-            reward_pool.append(reward)
+rewards=np.array(reward_set)
+# rewards=rewards-sum(rewards)/len(rewards)
 
-            state = next_state
-            state = torch.from_numpy(state).float()
-            state = Variable(state)
-
-            steps += 1
-
-            if done:
-                episode_durations.append(t + 1)
-                plot_durations()
-                break
-
-        # Update policy
-        if e > 0 and e % batch_size == 0:
-
-            # Discount reward
-            running_add = 0
-            for i in reversed(range(steps)):
-                if reward_pool[i] == 0:
-                    running_add = 0
-                else:
-                    running_add = running_add * gamma + reward_pool[i]
-                    reward_pool[i] = running_add
-
-            # Normalize reward
-            reward_mean = np.mean(reward_pool)
-            reward_std = np.std(reward_pool)
-            for i in range(steps):
-                reward_pool[i] = (reward_pool[i] - reward_mean) / reward_std
-
-            # Gradient Desent
-            optimizer.zero_grad()
-
-            for i in range(steps):
-                state = state_pool[i]
-                action = Variable(torch.FloatTensor([action_pool[i]]))
-                reward = reward_pool[i]
-
-                probs = policy_net(state)
-                m = Bernoulli(probs)
-                loss = -m.log_prob(action) * reward  # Negtive score function x reward
-                loss.backward()
-
-            optimizer.step()
-
-            state_pool = []
-            action_pool = []
-            reward_pool = []
-            steps = 0
+reward_mean = np.mean(rewards)
+reward_std = np.std(rewards)
+rewards= (rewards - reward_mean) / reward_std
 
 
+
+rewards=torch.tensor(rewards).to(torch.float32).to(device)
+
+statuses=torch.tensor(status_set)
+
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+
+model=model.to(device)
+
+
+class loss_set:
+    def __init__(self):
+        self.sum=0
+        self.n=0
+    def add(self,num):
+        self.sum+=num
+        self.n+=1
+    def show(self):
+        out=self.sum/self.n
+        self.sum=0
+        self.n=0
+        return out
+    
+mloss=loss_set()
+
+
+
+num_epochs=10
+
+for epoch in range(num_epochs):
+  for i in range(len(actions)):
+    optimizer.zero_grad()
+    prob=model(statuses[i].to(torch.float32).to(device))
+    # print(prob.item())
+    a=torch.distributions.Bernoulli(prob)
+    loss=-a.log_prob(actions[i])*rewards[i]
+    mloss.add(loss.item())
+    loss.backward()
+    optimizer.step()
+    if (i+1) % 200 == 0:
+            print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}' 
+                    .format(epoch+1, num_epochs, i+1, len(actions), mloss.show()))
+# rewards=torch.tensor(rewards)
+
+
+
+
+
+
+
+model.eval()
+
+
+status = env.reset()  
+    
+done=False
+count=0
+while not done:
+        count+=1
+        env.render()
+        
+        x=torch.tensor(status).to(torch.float32).to(device)
+        y=model(x)
+        
+        a=torch.distributions.Bernoulli(y)
+        
+        action=int(a.sample().item())
+
+        print(action)
+        # action=strategy_raw(status)
+    
+        status,reward,done,_=env.step(action)
+        
+print('count',count)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# def strategy_nn(status):
