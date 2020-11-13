@@ -173,18 +173,4 @@ print('count',count)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# def strategy_nn(status):
+torch.save(model.state_dict(), 'pole_raw.pth')  
