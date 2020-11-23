@@ -174,6 +174,8 @@ for year in range(20):
   num_epochs=10
   model.train()
   for epoch in range(num_epochs):
+   cliprange*=0.999
+
    for i in range(len(statuses)):
     optimizer.zero_grad()
     prob=model(statuses[i].to(torch.float32).to(device))
