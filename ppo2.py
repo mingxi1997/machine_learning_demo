@@ -193,7 +193,7 @@ for year in range(20):
     
     # print(ra)
     
-    loss=-(a.log_prob(actions[i]))*rewards[i]/ra
+    loss=-(a.log_prob(actions[i]))*rewards[i]*ra
     
     
 #     print(loss.item())
