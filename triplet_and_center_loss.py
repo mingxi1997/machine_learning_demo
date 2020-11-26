@@ -93,9 +93,7 @@ class Center(nn.Module):
 
     def forward(self, x, label, lambdas):
         
-        global show
-        show=x,label,lambdas
-        
+      
       
       
         center_exp = self.center[label]
