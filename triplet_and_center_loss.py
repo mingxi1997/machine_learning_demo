@@ -133,8 +133,8 @@ model=RES().to(device)
 # model.load_state_dict(torch.load('face_rec90.pt'))
 
 learning_rate=0.01
-
-dataloader = DataLoader(mydata, batch_size=256, shuffle=True, num_workers=4)
+batch_size=256
+dataloader = DataLoader(mydata, batch_size=batch_size, shuffle=True, num_workers=4)
 
 criterion = nn.CrossEntropyLoss()
 
@@ -170,7 +170,7 @@ for epoch in range(num_epochs):
       
       if (i+1) % 10 == 0:
             print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}' 
-                    .format(epoch+1, num_epochs, (i+1)*512, total_step, mloss.show()))
+                    .format(epoch+1, num_epochs, (i+1)*batch_size, total_step, mloss.show()))
       # if type(loss)==int:
       #     pass
       # else:
