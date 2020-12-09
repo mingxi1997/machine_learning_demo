@@ -35,17 +35,17 @@ class RES(nn.Module):
 # model.load_state_dict(torch.load('face_net_res18.pt'))
 # model=model.to(device)
 
-# from inceptv1 import InceptionResnetV1
-# model=InceptionResnetV1()
-# # model.load_state_dict(torch.load('face_net_c.pt'))
-# model.load_state_dict(torch.load('face_net_c3.pt'))
-# model=model.to(device)
-
-
-
-from facenet_pytorch import MTCNN, InceptionResnetV1
-model = InceptionResnetV1(pretrained='vggface2')
+from inceptv1 import InceptionResnetV1
+model=InceptionResnetV1()
+# model.load_state_dict(torch.load('face_net_c.pt'))
+model.load_state_dict(torch.load('face_net_sgd.pt'))
 model=model.to(device)
+
+
+
+# from facenet_pytorch import MTCNN, InceptionResnetV1
+# model = InceptionResnetV1(pretrained='vggface2')
+# model=model.to(device)
 
 
 
@@ -219,7 +219,7 @@ cap = cv2.VideoCapture(0)
 model.eval()
 
 
-
+pp1=torch.load('sgd1.pt')
 
 p1=torch.load('11.pt')
 
@@ -304,7 +304,7 @@ while True:
                   out=model(emb)
                 
              
-               
+                  print(torch.dist(out,pp1))
                
                   if torch.dist(out,p1)<0.5:
                       # print(torch.dist(out,p1),'111')
