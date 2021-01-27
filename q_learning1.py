@@ -8,7 +8,7 @@ from tqdm import tqdm
 import random
 import torch.nn.functional as F
 
-torch.manual_seed(1423)
+# torch.manual_seed(1423)
 
 class NN(nn.Module):  
     def __init__(self):
@@ -93,7 +93,7 @@ memory_set=memory_store()
         
 mloss=loss_set()
 
-e=1
+e=0.5
 
 
 
@@ -137,12 +137,18 @@ for iteration in tqdm(range(10000)):
 
         qp=predict_model(s)
         
-        #print(qp)
         
-        predict,_=torch.max(qp, axis=1)
         
+        # predict,_=torch.max(qp, axis=1)
+        
+        a=a.to(torch.int64).unsqueeze(dim=1)
+        predict=qp.gather(1, a).squeeze()
         
         next_q=torch.max(target_model(sn),axis=1).values*0.95+rn
+        
+        
+        
+        
    #     with torch.no_grad():
    #         qpp=target_model(sn)
     #    next_q, _ = torch.max(qpp, axis=1)
@@ -172,4 +178,4 @@ while not done:
         status, reward, done, info = env.step(action.item())
  
 print(count)
-torch.save(predict_model.state_dict(), 'our_model_3.pt')
+torch.save(predict_model.state_dict(), 'our_model.pt')
