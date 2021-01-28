@@ -19,12 +19,14 @@ class NN(nn.Module):
         super().__init__()
         self.fc1= nn.Linear(4, 36)
         # self.fc2= nn.Linear(36, 36)
-        self.fc3= nn.Linear(36, 1)
+        self.fc3= nn.Linear(36, 2)
     def forward(self,x):
-        out=self.fc1(x)
+        out=torch.relu(self.fc1(x))
         # out=self.fc2(out)
         out=self.fc3(out)
-        out=torch.sigmoid(out)
+        
+        
+        out=torch.nn.Softmax(dim=0)(out)
         return out
    
 
@@ -58,7 +60,7 @@ status_set=[]
 discount=0.9
 
 print('collecting data')
-for i in tqdm(range(500)):
+for i in tqdm(range(100)):
     status = env.reset()  
     raw_reward_set=[]
     done=False
@@ -104,7 +106,31 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 model=model.to(device)
 
+def test_count():
+  model.eval()
 
+
+  status = env.reset()  
+    
+  done=False
+  count=0
+  while not done:
+        count+=1
+        #env.render()
+        
+        x=torch.tensor(status).to(torch.float32).to(device)
+        y=model(x)
+        m=torch.distributions.Categorical(y)
+        
+        
+        action=int(m.sample().item())
+
+        print(action)
+        # action=strategy_raw(status)
+    
+        status,reward,done,_=env.step(action)
+        
+  print('count',count)
 class loss_set:
     def __init__(self):
         self.sum=0
@@ -122,55 +148,27 @@ mloss=loss_set()
 
 
 
-num_epochs=10
+num_epochs=200
 
 for epoch in range(num_epochs):
+  test_count()
+  model.train()
   for i in range(len(actions)):
     optimizer.zero_grad()
+    
+    
     prob=model(statuses[i].to(torch.float32).to(device))
-    # print(prob.item())
-    a=torch.distributions.Bernoulli(prob)
-    loss=-a.log_prob(actions[i])*rewards[i]
+    
+    m=torch.distributions.Categorical(prob)
+   
+   
+    loss=-torch.pow(np.e,m.log_prob(actions[i]))*rewards[i]/0.5
+    
+    # loss=m.log_prob(actions[i])*rewards[i]
+    
     mloss.add(loss.item())
     loss.backward()
     optimizer.step()
     if (i+1) % 200 == 0:
             print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}' 
                     .format(epoch+1, num_epochs, i+1, len(actions), mloss.show()))
-# rewards=torch.tensor(rewards)
-
-
-
-
-
-
-
-model.eval()
-
-
-status = env.reset()  
-    
-done=False
-count=0
-while not done:
-        count+=1
-        env.render()
-        
-        x=torch.tensor(status).to(torch.float32).to(device)
-        y=model(x)
-        
-        a=torch.distributions.Bernoulli(y)
-        
-        action=int(a.sample().item())
-
-        print(action)
-        # action=strategy_raw(status)
-    
-        status,reward,done,_=env.step(action)
-        
-print('count',count)
-
-
-
-
-torch.save(model.state_dict(), 'pole_raw.pth')  
