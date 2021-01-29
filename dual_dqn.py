@@ -15,6 +15,9 @@ class NN(nn.Module):
         super().__init__()
         self.fc1= nn.Linear(4, 64)
         self.fc3= nn.Linear(64, 2)
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
     def forward(self,x):
         out=self.fc1(x)
         out=torch.tanh(out)
