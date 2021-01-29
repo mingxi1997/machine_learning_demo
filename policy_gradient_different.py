@@ -22,7 +22,7 @@ class NN(nn.Module):
         self.fc3= nn.Linear(36, 2)
         for m in self.modules():
             if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform(m.weight)        
+                nn.init.xavier_uniform_(m.weight)        
     def forward(self,x):
         out=torch.relu(self.fc1(x))
         # out=self.fc2(out)
