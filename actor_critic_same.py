@@ -28,17 +28,19 @@ class NN(nn.Module):
         out=self.fc2(out)
         out=torch.nn.Softmax(dim=0)(out)
         return out
-   
-class actor_critic(nn.Module):
+
+    
+
+
+class AA(nn.Module):
     
     def __init__(self):
         super().__init__()
         self.fc1= nn.Linear(4, 36)
-        # self.fc2= nn.Linear(36, 36)
-        self.actor= nn.Linear(36, 2)
-        self.critic=nn.Linear(36,2)
+ 
         
-        
+        self.critic=nn.Linear(36,1)
+               
         for m in self.modules():
             if isinstance(m, nn.Linear):
                 nn.init.xavier_uniform_(m.weight)
@@ -46,15 +48,29 @@ class actor_critic(nn.Module):
                 
     def forward(self,x):
         out=self.fc1(x)
-      
-        
-        a=self.actor(torch.relu(out))
-        a=torch.nn.Softmax(dim=0)(a)
+       
+       
         
         c=self.critic(torch.tanh(out))
-  
-      
-        return a,c
+     
+        return c
+   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def accumulate(s,reward):
     result=0
     for i in range(0,len(reward)-s):
@@ -71,7 +87,9 @@ def gen_reward(reward):
 
 device=torch.device('cuda:0')
      
-model=actor_critic().to(device)
+model=NN().to(device)
+
+cmodel=AA().to(device)
 env = gym.make('CartPole-v0')
 env._max_episode_steps = 500
 status = env.reset()
@@ -81,7 +99,7 @@ count=0
 action_set=[]
 reward_set=[]
 status_set=[]
-discount=1
+discount=0.9
 
 class loss_set:
     def __init__(self):
@@ -102,9 +120,9 @@ mloss=loss_set()
 
 def strategy_nn(status):
     x=torch.tensor(status).to(torch.float32).to(device)
-    a,c=model(x)
+    y=model(x)
         
-    a=torch.distributions.Categorical(a)
+    a=torch.distributions.Categorical(y)
         
     action=int(a.sample().item())
     return action
@@ -122,8 +140,8 @@ def test_count():
         #env.render()
         
         x=torch.tensor(status).to(torch.float32).to(device)
-        a,c=model(x)
-        m=torch.distributions.Categorical(a)
+        y=model(x)
+        m=torch.distributions.Categorical(y)
         
         
         action=int(m.sample().item())
@@ -131,12 +149,14 @@ def test_count():
         status,reward,done,_=env.step(action)
         
   print('count',count)    
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+coptimizer = torch.optim.Adam(cmodel.parameters(), lr=0.001)
 
-discount=0.95
+
 for s in range(100):
  test_count()
 
-
+ model.train()
  for i in range(1):
     status = env.reset()  
     raw_reward_set=[]
@@ -177,34 +197,34 @@ for s in range(100):
 
  statuses=torch.tensor(status_set)
 
- optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 
 
  num_epochs=1
 
  for epoch in range(num_epochs):
-  discount=1
-  for i in range(len(actions)-1):
-    discount*=0.95
+  for i in range(len(actions)):
+   
+         
+    coptimizer.zero_grad()
     optimizer.zero_grad()
-    a,c=model(statuses[i].to(torch.float32).to(device))
-    
-    na,nc=model(statuses[i+1].to(torch.float32).to(device))
-    
-    pi_a=torch.distributions.Categorical(a).sample()
-    pi_na=torch.distributions.Categorical(a).sample()
+
     
     
-    predict_q=nc[pi_na.item()]*0.95+1
-    predict_q=predict_q.detach()
+    s_value=cmodel(statuses[i].to(torch.float32).to(device))
+    closs=torch.nn.MSELoss()(s_value[0],rewards[i])
+    closs.backward(retain_graph=True)
     
     
-    aloss=-torch.distributions.Categorical(a).log_prob(actions[i])*predict_q*discount
+    prob=model(statuses[i].to(torch.float32).to(device))
     
-    closs=torch.nn.MSELoss()(predict_q,c[pi_a.item()])
+    a=torch.distributions.Categorical(prob)
     
-    loss=aloss+closs
-    # mloss.add(loss.item())
+    
+    loss=-a.log_prob(actions[i])*(rewards[i]-s_value[0]).item()
+    mloss.add(loss.item())
     loss.backward()
     optimizer.step()
+    coptimizer.step()
+         
+         
