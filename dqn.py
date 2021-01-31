@@ -15,9 +15,6 @@ class NN(nn.Module):
         super().__init__()
         self.fc1= nn.Linear(4, 64)
         self.fc3= nn.Linear(64, 2)
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform(m.weight)
     def forward(self,x):
         out=self.fc1(x)
         out=torch.tanh(out)
@@ -98,7 +95,20 @@ mloss=loss_set()
 
 e=0.5
 
+def test_count():
+    predict_model.eval()
+    status=env.reset()
+    done=False
+    count=0
+    
+    while not done:
+        count+=1
+        action=last(status)
+       
+        status, reward, done, info = env.step(action.item())
+ 
 
+    print('count',count)
 
 def collect_experience(nums):
   c=0
@@ -121,6 +131,7 @@ def collect_experience(nums):
 collect_experience(128)
 
 for iteration in tqdm(range(10000)):
+    test_count()
     collect_experience(128)
     iteration+=1
     if iteration%5==0:
@@ -163,22 +174,7 @@ for iteration in tqdm(range(10000)):
 
         loss=criterion(predict,target)
         optimizer.zero_grad()
-        #print(loss.item())
         loss.backward()
         optimizer.step()
      
   
-predict_model.eval()
-status=env.reset()
-done=False
-count=0
-    
-while not done:
-        count+=1
-        env.render()
-        action=last(status)
-       
-        status, reward, done, info = env.step(action.item())
- 
-print(count)
-torch.save(predict_model.state_dict(), 'our_model.pt')
