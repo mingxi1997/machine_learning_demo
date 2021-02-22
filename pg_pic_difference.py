@@ -70,7 +70,7 @@ class NN(nn.Module):
     def __init__(self):
         super().__init__()
         
-        self.c1=nn.Conv2d(3,16,5,2,1)
+        self.c1=nn.Conv2d(6,16,5,2,1)
         self.n1=nn.BatchNorm2d(16)
         
         self.c2=nn.Conv2d(16,32,3,2,1)
@@ -121,7 +121,20 @@ def gen_reward(reward):
          n_reward.append(accumulate(i,reward))
      return n_reward
 
-
+def stack_work(series):
+    s=[]
+    for j in range(len(series)):
+        
+       if j!=0:
+           s.append(torch.cat((series[j].squeeze(),series[j-1].squeeze())).unsqueeze(0))
+ 
+           
+       else:
+           s.append(torch.cat((series[j].squeeze(),series[j].squeeze())).unsqueeze(0))
+    return s
+        
+  
+    
      
 model=NN().to(device)  
         
@@ -175,6 +188,8 @@ rewards= (rewards - reward_mean) / reward_std
 
 
 rewards=torch.tensor(rewards).to(torch.float32)
+status_set=stack_work(status_set)
+
 
 # statuses=torch.tensor(status_set)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
@@ -217,17 +232,20 @@ def test_count():
     
   done=False
   count=0
+  s=[]
   while not done:
         count+=1
+        s.append(get_screen())
         
-        
-        x=get_screen().to(torch.float32).to(device)
-        y=model(x)
+        if count==1:
+            x=torch.cat((get_screen().squeeze(),get_screen().squeeze())).unsqueeze(0)
+        else:
+            x=torch.cat((s[-1].squeeze(),s[-2].squeeze())).unsqueeze(0)
+        y=model(x.to(torch.float32).to(device))
 
         
         
         action=int(torch.distributions.Categorical(y).sample().item())
-        print(action)
        
         # action=strategy_raw(status)
     
@@ -251,7 +269,7 @@ mloss=loss_set()
 
 
 
-num_epochs=200
+num_epochs=1000
 
 for epoch in tqdm(range(num_epochs)):
     test_count()
@@ -272,5 +290,6 @@ for epoch in tqdm(range(num_epochs)):
     
         loss.backward()
         optimizer.step()
+
 
 
