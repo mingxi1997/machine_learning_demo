@@ -76,8 +76,8 @@ def strategy_raw(status):
 class NN(nn.Module):  
     def __init__(self):
         super().__init__()
-        
-        self.c1=nn.Conv2d(3,16,5,2,1)
+        self.shape=1
+        self.c1=nn.Conv2d(6,16,5,2,1)
         self.n1=nn.BatchNorm2d(16)
         
         self.c2=nn.Conv2d(16,32,3,2,1)
@@ -86,9 +86,12 @@ class NN(nn.Module):
         self.c3=nn.Conv2d(32,32,3,3,1)
         self.n3=nn.BatchNorm2d(32)
         
+        self.c4=nn.Conv2d(32,32,3,3,1)
+        self.n4=nn.BatchNorm2d(32)
         
         
-        self.fc1= nn.Linear(1024, 64)
+        
+        self.fc1= nn.Linear(192, 64)
         self.fc3= nn.Linear(64, 2)
     def forward(self,x):
         
@@ -105,11 +108,17 @@ class NN(nn.Module):
         out=self.n3(out)
         out=nn.functional.relu(out)
         
+        out=self.c4(out)
+        out=self.n4(out)
+        out=nn.functional.relu(out)
+        
+        
         out=out.view(out.size()[0],-1)
+    
         
         out=self.fc1(out)
      
-        out=torch.relu(out)
+        out=torch.tanh(out)
         out=self.fc3(out)
         out=nn.Softmax(dim=1)(out)
       
@@ -147,6 +156,24 @@ discount=0.9
 print('collecting data')
 
 
+def stack_work(series):
+    s=[]
+    for j in range(len(series)):
+        
+       if j!=0:
+           s.append(torch.cat((series[j].squeeze(),series[j-1].squeeze())).unsqueeze(0))
+ 
+           
+       else:
+           s.append(torch.cat((series[j].squeeze(),series[j].squeeze())).unsqueeze(0))
+    return s
+        
+  
+    
+    
+
+
+
 def collect_data(times):
   count=0
   for i in range(times):
@@ -156,9 +183,10 @@ def collect_data(times):
     while not done:
         status_set.append(get_screen())
         count+=1
-    
-        action=strategy_raw(get_screen())
-    
+        if count==1:
+            action=strategy_raw(torch.cat((get_screen().squeeze(),get_screen().squeeze())).unsqueeze(0))
+        else:
+            action=strategy_raw(torch.cat((status_set[-1].squeeze(),status_set[-2].squeeze())).unsqueeze(0))
         action_set.append(action)
         status,reward,done,_=env.step(action)
     
@@ -212,35 +240,6 @@ class my_dataset(Dataset):
 
 
 
-
-
-
-
-def test_count():
-  model.eval()
-
-
-  status = env.reset()  
-    
-  done=False
-  count=0
-  while not done:
-        count+=1
-        
-        
-        x=get_screen().to(torch.float32).to(device)
-        y=model(x)
-
-        
-        
-        action=int(torch.distributions.Categorical(y).sample().item())
-        # print(action)
-       
-        # action=strategy_raw(status)
-    
-        status,reward,done,_=env.step(action)
-        
-  print('count',count)
 class loss_set:
     def __init__(self):
         self.sum=0
@@ -258,9 +257,12 @@ mloss=loss_set()
 
 
 for centry in tqdm(range(100)):
-  num_epochs=30
+  num_epochs=1
   status_set,actions,rewards=collect_data(128)
-  mydata=my_dataset(status_set,actions,rewards)
+  
+  status_sets=stack_work(status_set)
+  
+  mydata=my_dataset(status_sets,actions,rewards)
 
   dataloader = DataLoader(mydata, batch_size=128, shuffle=True, num_workers=4)
 
