@@ -23,7 +23,6 @@ from flask import Flask
 #input output
 from io import BytesIO
 # Load model
-from model import Model
 
 import onnxruntime
 
@@ -33,8 +32,7 @@ sio = socketio.Server()
 #our flask (web) app
 app = Flask(__name__)
 
-model = Model()
-model.loadModel()
+
 
 #registering event handler for the server
 
