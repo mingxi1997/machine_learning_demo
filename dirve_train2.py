@@ -66,9 +66,9 @@ old_data_index = pd.concat(record, axis=0, ignore_index=True)
 
 
 d2=pd.read_csv('~/Downloads/track2data/'+'driving_log.csv',names=['center', 'left', 'right', 'steering', 'throttle', 'reverse', 'speed'])
-#d3=pd.read_csv('~/Downloads/dataset/'+'driving_log.csv',names=['center', 'left', 'right', 'steering', 'throttle', 'reverse', 'speed'])
+d3=pd.read_csv('~/Downloads/dataset/'+'driving_log.csv',names=['center', 'left', 'right', 'steering', 'throttle', 'reverse', 'speed'])
 
-old_data_index=pd.concat([old_data_index,d2],axis=0,ignore_index=True)
+old_data_index=pd.concat([old_data_index,d2,d3],axis=0,ignore_index=True)
 
 nozero_set = []
 zero_set = []
@@ -77,7 +77,7 @@ for i in range(len(old_data_index)):
         nozero_set.append(i)
     else:
         zero_set.append(i)
-choose = np.random.choice(np.array(zero_set), 2000)
+choose = np.random.choice(np.array(zero_set), 3000)
 
 nozero_set.extend(list(choose))
 
@@ -199,6 +199,7 @@ trainset, valset = torch.utils.data.random_split(mydata, [tsize, vsize])
 
 device = torch.device('cuda:0')
 model = Drive().to(device)
+# model.load_state_dict(torch.load('./saved_model/{}epoch.pth'.format(1)))
 
 batch_size = 2048
 criterion = nn.MSELoss()
@@ -277,7 +278,7 @@ print('show loss')
 plt.plot(train_loss)
 plt.plot(test_loss)
 plt.show()
-# model.load_state_dict(torch.load('./saved_model/{}epoch.pth'.format(best_epoch)))
+model.load_state_dict(torch.load('./saved_model/{}epoch.pth'.format(best_epoch)))
 
 
 x = torch.randn(1, 3, 70, 320, requires_grad=True).to(device)
