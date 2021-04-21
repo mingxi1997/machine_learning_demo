@@ -15,13 +15,27 @@ from torch.optim.lr_scheduler import MultiStepLR
 import random
 
 
-root='~/Downloads/dataset/IMG/'
+# root='~/Downloads/dataset/IMG/'
 
-d1=pd.read_csv('~/Downloads/track2data/'+'driving_log.csv',names=['center', 'left', 'right', 'steering', 'throttle', 'reverse', 'speed'])
-d2=pd.read_csv('~/Downloads/dataset/'+'driving_log.csv',names=['center', 'left', 'right', 'steering', 'throttle', 'reverse', 'speed'])
+root='/home/xu/save/'
 
-old_data_index=pd.concat([d1,d2],axis=0,ignore_index=True)
-# old_data_index=pd.read_csv('~/Downloads/track2data/'+'driving_log.csv',names=['center', 'left', 'right', 'steering', 'throttle', 'reverse', 'speed'])
+docs=[root+d+'/'+'driving_log.csv' for d in os.listdir(root)]
+# folders=[root+d+'/'+'IMG/' for d in os.listdir(root)]
+
+record=[]
+for doc in docs:
+    record.append(pd.read_csv(doc,names=['center', 'left', 'right', 'steering', 'throttle', 'reverse', 'speed']))
+
+
+
+old_data_index=pd.concat(record,axis=0,ignore_index=True)
+
+
+d2=pd.read_csv('~/Downloads/track2data/'+'driving_log.csv',names=['center', 'left', 'right', 'steering', 'throttle', 'reverse', 'speed'])
+# d3=pd.read_csv('~/Downloads/dataset/'+'driving_log.csv',names=['center', 'left', 'right', 'steering', 'throttle', 'reverse', 'speed'])
+
+old_data_index=pd.concat([d2,old_data_index],axis=0,ignore_index=True)
+
 nozero_set=[]
 zero_set=[]
 for i in range(len(old_data_index)):
@@ -125,10 +139,14 @@ class my_dataset(Dataset):
         steering=-1 if steering<-1 else steering
         steering=1 if steering>1 else steering
     
-        pic_root='/home/xu/Downloads/'+pic_root[8:].replace('\\','/')
-
+      #  pic_root='/home/xu/Downloads/'+pic_root[8:].replace('\\','/')
+        
+        pic_root=pic_root.replace('\\','/').replace('D:/jq','/home/xu').replace('D:','/home/xu').replace('Desktop','/home/xu/Downloads')
     
-        frame=cv2.imread(pic_root)[65:-25, :, :]
+        frame=cv2.imread(pic_root)[55:-35, :, :]
+        
+        
+        
         frame = cv2.cvtColor(frame, code=cv2.COLOR_BGR2HSV)
         frame[:, :, 2] = frame[:, :, 2] *random.uniform(0.2, 1.5)
         frame[:, :, 2] = np.clip(frame[:, :, 2], a_min=0, a_max=255)
@@ -157,17 +175,14 @@ class my_dataset(Dataset):
 
 mydata=my_dataset()
 
-
+# for i ,j in mydata:
+#     print(i)
     
     
     
 tsize=int(len(data_index)*0.8)
 vsize=(len(data_index)-int(len(data_index)*0.8))
 trainset, valset = torch.utils.data.random_split(mydata, [tsize, vsize])
-
-
-
-
 
 
 
@@ -198,7 +213,7 @@ class loss_set:
     
 mloss=loss_set()
 total_step=len(data_index)/batch_size
-num_epochs=80
+num_epochs=60
 train_loss=[]
 test_loss=[]
 for epoch in range(num_epochs):
@@ -234,33 +249,26 @@ for epoch in range(num_epochs):
     print ('Epoch [{}/{}],  test_Loss: {:.4f}' 
                     .format(epoch+1, num_epochs,  test_loss[-1]))
     
-    if epoch >4 :
-        if test_loss[-1]>test_loss[-2] and test_loss[-2]>test_loss[-3] :
+    if epoch >10 :
+        if test_loss[-1]>test_loss[-3] and test_loss[-2]>test_loss[-3] :
             print('early stopping')
             break
         
 print('start backup')    
-best_epoch=len(test_loss)-4
+best_epoch=len(test_loss)-3
     
 print('show loss')
 plt.plot(train_loss)
 plt.plot(test_loss)
 plt.show()
 model.load_state_dict(torch.load('./saved_model/{}epoch.pth'.format(best_epoch)))
-#model.eval()
-# for i,(p,l) in enumerate(t):
-#     p=p.to(torch.float32).to(device)
-#     l=l.to(torch.float32).to(device)
-#     y=model(p).squeeze()
-    
-#     print(y.item(),l.item())
-    
+
 
 x = torch.randn(1, 3, 70, 320, requires_grad=True).to(device)
 torch_out = model(x)
 torch.onnx.export(model,
                   x,
-                  "car2plus_track2.onnx",
+                  "car_lap1.onnx",
                   export_params = True,
                   opset_version=9,
                   do_constant_folding=True,
