@@ -374,14 +374,16 @@ for epoch in range(num_epochs):
       
     print ('Epoch [{}/{}],  test_Loss: {:.4f}' 
                     .format(epoch+1, num_epochs,  test_loss[-1]))
-       
-    if test_loss[-1]>test_loss[-2] and test_loss[-2]>test_loss[-3]:
+    if epoch>4:
+        if test_loss[-1]>test_loss[-2] and test_loss[-2]>test_loss[-3]:
             print('early stopping')
             break      
         
 best_epoch=len(test_loss)-3    
 model.load_state_dict(torch.load('./model/{}epoch.pth'.format(best_epoch)))
-    
+plt.plot(train_loss)
+plt.plot(test_loss)
+plt.show()    
     
     
 x = torch.randn(1, 3, 64, 64, requires_grad=True).to(device)
