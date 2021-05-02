@@ -265,7 +265,7 @@ class my_dataset(Dataset):
     
         image = random_brightness(image)
         
-        image=image/217.5-1.0
+        image=image/127.5-1.0
         
         image=image.transpose(2,0,1)
 #    plt.figure()
