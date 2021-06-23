@@ -3,43 +3,21 @@ import random
 import torch
 import torch.nn as nn
 import numpy as np
-
-from tqdm import tqdm
-
-
-
-def strategy_raw(status):
-    action=random.choice((0,1))
-    return action
+from tensorboardX import SummaryWriter
+writer=SummaryWriter()
 
 
-class NN(nn.Module):
+
+class AC(nn.Module):
     
     def __init__(self):
         super().__init__()
-        self.fc1= nn.Linear(4, 36)
-        self.fc2= nn.Linear(36, 2)
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight)
-    def forward(self,x):
-        out=self.fc1(x)
-        out=torch.relu(out)
-        out=self.fc2(out)
-        out=torch.nn.Softmax(dim=0)(out)
-        return out
-
-    
-
-
-class AA(nn.Module):
-    
-    def __init__(self):
-        super().__init__()
-        self.fc1= nn.Linear(4, 36)
- 
+        self.fc= nn.Sequential(nn.Linear(4, 64),
+                                 nn.ReLU(),
+                                 nn.Linear(64, 128),)
         
-        self.critic=nn.Linear(36,1)
+        self.actor=nn.Linear(128,2)
+        self.critic=nn.Linear(128,1)
                
         for m in self.modules():
             if isinstance(m, nn.Linear):
@@ -47,116 +25,65 @@ class AA(nn.Module):
                 
                 
     def forward(self,x):
-        out=self.fc1(x)
+        out=self.fc(x)
        
        
-        
-        c=self.critic(torch.tanh(out))
+        a=torch.nn.Softmax(dim=0)(self.actor(torch.relu(out)))
+        c=self.critic(torch.relu(out))
      
-        return c
+        return a,c
    
-
-
-
-def accumulate(s,reward):
-    result=0
-    for i in range(0,len(reward)-s):
-
-        result+=reward[i]*pow(0.9,i)
-    return result
-
-def gen_reward(reward):  
-     n_reward=[]
-     for i in range(len(reward)):
-         n_reward.append(accumulate(i,reward))
-     return n_reward
 
 
 device=torch.device('cuda:0')
      
-model=NN().to(device)
+model=AC().to(device)
 
-cmodel=AA().to(device)
+# cmodel=AA().to(device)
 env = gym.make('CartPole-v0')
 env._max_episode_steps = 2000
 status = env.reset()
 
-count=0
 
 
 
+def choose_action(status):
+    global show
 
-discount=0.9
-
-class loss_set:
-    def __init__(self):
-        self.sum=0
-        self.n=0
-    def add(self,num):
-        self.sum+=num
-        self.n+=1
-    def show(self):
-        out=self.sum/self.n
-        self.sum=0
-        self.n=0
-        return out
-    
-mloss=loss_set()
-
-
-
-def strategy_nn(status):
+    model.eval()
     x=torch.tensor(status).to(torch.float32).to(device)
-    y=model(x)
-        
-    a=torch.distributions.Categorical(y)
+    A,C=model(x)
+   
+    a=torch.distributions.Categorical(A)
+    
+       
+
         
     action=int(a.sample().item())
-    return action
-
-def test_count():
-  model.eval()
-
-
-  status = env.reset()  
     
-  done=False
-  count=0
-  while not done:
-        count+=1
-        #env.render()
-        
-        x=torch.tensor(status).to(torch.float32).to(device)
-        y=model(x)
-        m=torch.distributions.Categorical(y)
-        
-        
-        action=int(m.sample().item())
+    
+    log_action=a.log_prob(torch.tensor(action*1.).to(device)).item()
+    
 
-        status,reward,done,_=env.step(action)
-        
-  print('count',count)    
+
+    return action,log_action
+ 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-coptimizer = torch.optim.Adam(cmodel.parameters(), lr=0.001)
-cliprange=0.999
+cliprange=0.1
 
 for s in range(10000):
-    test_count()
-
-    model.train()
+    exp=[]
     
-    experiences=[]
-    
-    for i in range(1):
+    while True:
         done=False
         status = env.reset()  
-    
+        c=0
         while not done:
-            
+            c+=1
             experience=[]
             experience.append(status)
   
-            action=strategy_nn(status)
+            action,log_action=choose_action(status)
     
             experience.append(action)
             status,reward,done,_=env.step(action)
@@ -164,67 +91,78 @@ for s in range(10000):
             experience.append(done)
 
             experience.append(reward)
-            experiences.append(experience)
+            experience.append(log_action)
+            experience.append(status)
+
+            exp.append(experience)
+            
+        print('count',c)
+        writer.add_scalar('count',c,s)
+
+        if len(exp)>128:
+            break
+            
    
 
 
-
+    model.train()
     num_epochs=1
  
 
     for epoch in range(num_epochs):
-        I=1
-        for i in range(len(experiences)-1):
-            coptimizer.zero_grad()
+        
+        exp=random.sample(exp,128)
+        for i in range(len(exp)):
+            optimizer.zero_grad()
+
+            status=torch.tensor(exp[i][0]).to(torch.float32).to(device)
             
-            status=torch.tensor(experiences[i][0]).to(torch.float32).to(device)
+            next_status=torch.tensor(exp[i][5]).to(torch.float32).to(device)
             
-            next_status=torch.tensor(experiences[i+1][0]).to(torch.float32).to(device)
+            done=torch.tensor(exp[i][2]).to(torch.float32).to(device)
             
-            done=torch.tensor(experiences[i+1][2]).to(torch.float32).to(device)
+            action=torch.tensor(exp[i][1]).to(torch.float32).to(device)
             
-            action=torch.tensor(experiences[i][1]).to(torch.float32).to(device)
+            log_action=torch.tensor(exp[i][4]).to(torch.float32).to(device)
             
-            s_value=cmodel(status)[0]
+            
+            prob,s_value=model(status)
     
-            n_s_value=cmodel(next_status)[0]
+            _,n_s_value=model(next_status)
             
-            target_value=1+(1-done)*0.9*n_s_value
+            target_value=1+(1-done)*0.8*n_s_value
     
     
-            closs=torch.nn.MSELoss()(s_value,target_value.detach())
+            vloss=torch.nn.functional.smooth_l1_loss(s_value,target_value)
             
             
             
             # print(closs.item())
             
-            closs.backward()
-            
-            coptimizer.step()
-      
-            optimizer.zero_grad()
-
-            prob=model(status)
     
             a=torch.distributions.Categorical(prob)
     
     
     
-            ratio = torch.exp(a.log_prob(action) -prob[int(action.item())])
+            ratio = torch.exp(a.log_prob(action) -log_action)
+            
     
   
             rarion_clamp = torch.clamp(ratio, 1.0 - cliprange, 1.0 + cliprange) 
             
-            ra = torch.min(ratio, rarion_clamp).detach()
+            ra = torch.min(ratio, rarion_clamp)
     
-            loss=-a.log_prob(action)*(target_value-s_value).item()*I*ra
+            aloss=-((target_value-s_value)*ra).sum()
+            
+            loss=aloss+vloss*10-a.entropy()*0.01
             
             
-            
-            
-            
-            mloss.add(loss.item())
             loss.backward()
             optimizer.step()
-            I*=0.9
+        
+    
+    
+    
+    
+    
          
