@@ -4,6 +4,11 @@ import torch
 import torch.nn as nn
 import numpy as np
 from tensorboardX import SummaryWriter
+
+
+
+ciritic_coefficient = 0.5
+entropy_coefficient = 0.01
 writer=SummaryWriter()
 
 
@@ -12,9 +17,11 @@ class AC(nn.Module):
     
     def __init__(self):
         super().__init__()
-        self.fc= nn.Sequential(nn.Linear(4, 64),
-                                 nn.ReLU(),
-                                 nn.Linear(64, 128),)
+        self.fc= nn.Sequential(nn.Linear(4, 128),
+                               # nn.ReLU(),
+                               # nn.Linear(128, 128),
+                               
+                                 )
         
         self.actor=nn.Linear(128,2)
         self.critic=nn.Linear(128,1)
@@ -28,11 +35,15 @@ class AC(nn.Module):
         out=self.fc(x)
        
        
-        a=torch.nn.Softmax(dim=0)(self.actor(torch.relu(out)))
+        a=torch.nn.Softmax(dim=-1)(self.actor(torch.relu(out)))
         c=self.critic(torch.relu(out))
      
         return a,c
-   
+def sample(status_set, action_set, returns, advantages, old_policies,old_values):
+    
+    
+    index=random.sample(list(range(len(status_set))),8)
+    return status_set[index], action_set[index], returns[index], advantages[index], old_policies[index],old_values[index]
 
 
 device=torch.device('cuda:0')
@@ -43,8 +54,38 @@ model=AC().to(device)
 env = gym.make('CartPole-v0')
 env._max_episode_steps = 2000
 status = env.reset()
+gamma = 0.99
+
+lambda_gae = 0.96
 
 
+def get_advantage(rewards,values):
+    returns=torch.zeros_like(rewards)
+    for t in reversed(range(len(rewards))):
+    
+        if t==len(rewards)-1:
+            returns[t]=rewards[t]
+        else:
+            returns[t]=rewards[t]+gamma*returns[t+1]
+        
+        
+    running_tderror=torch.zeros_like(rewards)
+       
+    for t in reversed(range(len(rewards))):
+         if t==len(rewards)-1:
+            running_tderror[t]=rewards[t]-values[t]
+         else:
+             running_tderror[t]=rewards[t]+gamma*values[t+1]-values[t]
+             
+             
+    advantages=    torch.zeros_like(rewards)
+       
+    for t in reversed(range(len(rewards))):
+         if t==len(rewards)-1:
+            advantages[t]=running_tderror[t]
+         else:
+             advantages[t]=running_tderror[t]+(gamma * lambda_gae)*advantages[t+1]
+    return returns,advantages
 
 
 def choose_action(status):
@@ -62,103 +103,136 @@ def choose_action(status):
     action=int(a.sample().item())
     
     
-    log_action=a.log_prob(torch.tensor(action*1.).to(device)).item()
     
 
 
-    return action,log_action
+    return action,A
  
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 cliprange=0.1
+running_score=0
+
+epsilon_clip=0.1
+
 
 for s in range(10000):
     exp=[]
     
-    while True:
-        done=False
-        status = env.reset()  
-        c=0
-        while not done:
-            c+=1
-            experience=[]
-            experience.append(status)
-  
-            action,log_action=choose_action(status)
     
-            experience.append(action)
-            status,reward,done,_=env.step(action)
+    done=False
+    status = env.reset()  
+    c=0
+    while not done:
+        c+=1
+        
+        
+        experience=[]
+        experience.append(status)
+  
+        action,critic=choose_action(status)
+        
+        action_one_hot = torch.zeros(2)
+        action_one_hot[action] = 1
 
-            experience.append(done)
+        experience.append(action_one_hot)
+        # experience.append(policy)
+        status,reward,done,_=env.step(action)
 
-            experience.append(reward)
-            experience.append(log_action)
-            experience.append(status)
-
-            exp.append(experience)
+        if done:
+            reward=-1.
             
-        print('count',c)
-        writer.add_scalar('count',c,s)
+            
+        # experience.append(status)
 
-        if len(exp)>128:
-            break
+        experience.append(reward)
+        
+
+        exp.append(experience)
+    
+                
+                        
+
+            
+        
+    print(c)
+    # score=c
+    # running_score = 0.99 * running_score + 0.01 * score
+    # print(running_score)
+   
+  
             
    
+    
+    nexp=list(zip(*exp))
+    
+   
+    status_set=torch.tensor(nexp[0]).to(torch.float32).to(device)
+    action_set=torch.stack(nexp[1]).to(torch.float32).to(device)
+    
+    # policy_set=torch.stack(nexp[2]).to(torch.float32).to(device)
+    # nstatus=torch.tensor(nexp[3]).to(torch.float32).to(device)
 
+    reward_set=nexp[2]
+    
+   
+    model.eval()
 
-    model.train()
-    num_epochs=1
- 
+      
+    old_policies,old_values=model(status_set)
+    
+    old_policies = old_policies.detach()
+    
+    
+   
+    values=old_values.detach()
+    
+    
+    returns,advantages   =get_advantage(torch.tensor(reward_set), old_values.cpu())
+    
+    advantages=advantages.to(torch.float32).to(device).detach()
+    returns=returns.to(torch.float32).to(device).detach()
 
-    for epoch in range(num_epochs):
-        
-        exp=random.sample(exp,128)
-        for i in range(len(exp)):
-            optimizer.zero_grad()
+    status_set, action_set, returns, advantages, old_policies,old_values=sample(status_set, action_set, returns, advantages, old_policies,old_values)
 
-            status=torch.tensor(exp[i][0]).to(torch.float32).to(device)
-            
-            next_status=torch.tensor(exp[i][5]).to(torch.float32).to(device)
-            
-            done=torch.tensor(exp[i][2]).to(torch.float32).to(device)
-            
-            action=torch.tensor(exp[i][1]).to(torch.float32).to(device)
-            
-            log_action=torch.tensor(exp[i][4]).to(torch.float32).to(device)
-            
-            
-            prob,s_value=model(status)
-    
-            _,n_s_value=model(next_status)
-            
-            target_value=1+(1-done)*0.8*n_s_value
-    
-    
-            vloss=torch.nn.functional.smooth_l1_loss(s_value,target_value)
-            
-            
-            
-            # print(closs.item())
-            
-    
-            a=torch.distributions.Categorical(prob)
-    
-    
-    
-            ratio = torch.exp(a.log_prob(action) -log_action)
-            
-    
+    for _ in range(len(status_set)*10//8):
   
-            rarion_clamp = torch.clamp(ratio, 1.0 - cliprange, 1.0 + cliprange) 
-            
-            ra = torch.min(ratio, rarion_clamp)
+        # model.train()
+
     
-            aloss=-((target_value-s_value)*ra).sum()
-            
-            loss=aloss+vloss*10-a.entropy()*0.01
-            
-            
-            loss.backward()
-            optimizer.step()
+    
+        
+        
+        npolicy,nvalues=model(status_set)
+    
+        
+    
+    
+    
+        
+        critic_loss = (returns - nvalues).pow(2).sum()
+    
+    
+        ratios = ((npolicy / old_policies) * action_set).sum(dim=1)
+        clipped_ratios = torch.clamp(ratios, min=1.0-epsilon_clip, max=1.0+epsilon_clip).squeeze(0)
+    
+        actor_loss = -torch.min(ratios*advantages ,clipped_ratios*advantages ).sum()
+    
+        
+        policy_entropy = (torch.log(npolicy) * npolicy).sum(1, keepdim=True).mean()
+    
+        loss = actor_loss + 0.5*critic_loss - 0.01* policy_entropy
+        
+        optimizer.zero_grad()
+
+        
+        loss.backward()
+        
+
+        optimizer.step()
+   
+    
+
+
         
     
     
