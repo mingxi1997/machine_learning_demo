@@ -60,6 +60,7 @@ lambda_gae = 0.96
 
 
 def get_advantage(rewards,values):
+    values=values.squeeze()
     returns=torch.zeros_like(rewards)
     for t in reversed(range(len(rewards))):
     
@@ -85,7 +86,6 @@ def get_advantage(rewards,values):
             advantages[t]=running_tderror[t]
          else:
              advantages[t]=running_tderror[t]+(gamma * lambda_gae)*advantages[t+1]
-             
     returns=advantages+values
     return returns,advantages
 
@@ -116,7 +116,7 @@ running_score=0
 epsilon_clip=0.2
 
 
-for s in range(10000):
+for s in range(1000):
     epsilon_clip*=0.99
     exp=[]
     
@@ -210,7 +210,7 @@ for s in range(10000):
     
     
         
-        critic_loss = (returns - nvalues).pow(2).sum()
+        critic_loss = (returns - nvalues.squeeze()).pow(2).sum()
     
     
         ratios = ((npolicy / old_policies) * action_set).sum(dim=1)
