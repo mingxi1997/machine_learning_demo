@@ -113,10 +113,11 @@ def choose_action(status):
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 running_score=0
 
-epsilon_clip=0.1
+epsilon_clip=0.2
 
 
 for s in range(10000):
+    epsilon_clip*=0.99
     exp=[]
     
     
@@ -191,14 +192,14 @@ for s in range(10000):
     
     advantages=advantages.to(torch.float32).to(device).detach()
     returns=returns.to(torch.float32).to(device).detach()
-
     status_set, action_set, returns, advantages, old_policies,old_values=sample(status_set, action_set, returns, advantages, old_policies,old_values)
 
-    for _ in range(20):
+
+    for _ in range(40):
   
         # model.train()
 
-    
+
     
         
         
@@ -233,4 +234,10 @@ for s in range(10000):
     
 
 
+        
+    
+    
+    
+    
+    
          
