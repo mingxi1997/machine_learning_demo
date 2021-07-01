@@ -157,11 +157,11 @@ for s in range(1000):
             
         
     print(c)
-    score=c
-    running_score = 0.99 * running_score + 0.01 * score
-    print(running_score)
-    writer.add_scalar('c',c,s)
-    writer.add_scalar('running_score',running_score,s)
+    # score=c
+    # running_score = 0.99 * running_score + 0.01 * score
+    # print(running_score)
+    # writer.add_scalar('c',c,s)
+    # writer.add_scalar('running_score',running_score,s)
   
             
    
