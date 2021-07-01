@@ -159,7 +159,8 @@ for s in range(10000):
     score=c
     running_score = 0.99 * running_score + 0.01 * score
     print(running_score)
-   
+    writer.add_scalar('c',c,s)
+    writer.add_scalar('running_score',running_score,s)
   
             
    
@@ -193,7 +194,7 @@ for s in range(10000):
 
     status_set, action_set, returns, advantages, old_policies,old_values=sample(status_set, action_set, returns, advantages, old_policies,old_values)
 
-    for _ in range(10):
+    for _ in range(20):
   
         # model.train()
 
@@ -232,10 +233,4 @@ for s in range(10000):
     
 
 
-        
-    
-    
-    
-    
-    
          
