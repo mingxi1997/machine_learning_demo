@@ -18,8 +18,8 @@ class AC(nn.Module):
     def __init__(self):
         super().__init__()
         self.fc= nn.Sequential(nn.Linear(4, 128),
-                               # nn.ReLU(),
-                               # nn.Linear(128, 128),
+                                nn.ReLU(),
+                                nn.Linear(128, 128),
                                
                                  )
         
@@ -42,7 +42,7 @@ class AC(nn.Module):
 def sample(status_set, action_set, returns, advantages, old_policies,old_values):
     
     
-    index=random.sample(list(range(len(status_set))),8)
+    index=random.sample(list(range(len(status_set))),int(len(status_set)*0.5))
     return status_set[index], action_set[index], returns[index], advantages[index], old_policies[index],old_values[index]
 
 
@@ -85,6 +85,8 @@ def get_advantage(rewards,values):
             advantages[t]=running_tderror[t]
          else:
              advantages[t]=running_tderror[t]+(gamma * lambda_gae)*advantages[t+1]
+             
+    returns=advantages+values
     return returns,advantages
 
 
@@ -109,7 +111,6 @@ def choose_action(status):
     return action,A
  
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-cliprange=0.1
 running_score=0
 
 epsilon_clip=0.1
@@ -155,9 +156,9 @@ for s in range(10000):
             
         
     print(c)
-    # score=c
-    # running_score = 0.99 * running_score + 0.01 * score
-    # print(running_score)
+    score=c
+    running_score = 0.99 * running_score + 0.01 * score
+    print(running_score)
    
   
             
@@ -169,8 +170,6 @@ for s in range(10000):
     status_set=torch.tensor(nexp[0]).to(torch.float32).to(device)
     action_set=torch.stack(nexp[1]).to(torch.float32).to(device)
     
-    # policy_set=torch.stack(nexp[2]).to(torch.float32).to(device)
-    # nstatus=torch.tensor(nexp[3]).to(torch.float32).to(device)
 
     reward_set=nexp[2]
     
@@ -194,7 +193,7 @@ for s in range(10000):
 
     status_set, action_set, returns, advantages, old_policies,old_values=sample(status_set, action_set, returns, advantages, old_policies,old_values)
 
-    for _ in range(len(status_set)*10//8):
+    for _ in range(10):
   
         # model.train()
 
