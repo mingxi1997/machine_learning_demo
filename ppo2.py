@@ -85,19 +85,17 @@ def get_advantage(rewards,values):
 
 def choose_action(status):
 
-    model.eval()
-    x=torch.tensor(status).to(torch.float32).to(device)
-    A,C=model(x)
-   
-    a=torch.distributions.Categorical(A)
-    
+    with torch.no_grad():
+        x=torch.tensor(status).to(torch.float32).to(device)
+        policy,value=model(x)
        
-
+        dist=torch.distributions.Categorical(policy)
         
-    action=int(a.sample().item())
+            
+        action=int(dist.sample().item())
+        
     
-
-    return action,A
+        return action,value,policy
  
 
 
@@ -117,7 +115,7 @@ for s in range(10000):
         experience=[]
         experience.append(status)
   
-        action,_=choose_action(status)
+        action,value,policy=choose_action(status)
         
         action_one_hot = torch.zeros(2)
         action_one_hot[action] = 1
@@ -132,7 +130,8 @@ for s in range(10000):
             
 
         experience.append(reward)
-        
+        experience.append(policy)
+        experience.append(value)
 
         exp.append(experience)
     
@@ -145,31 +144,15 @@ for s in range(10000):
     writer.add_scalar('c',c,s)
     writer.add_scalar('running_score',running_score,s)
   
-            
-   
-    
     nexp=list(zip(*exp))
-    
    
     status_set=torch.tensor(nexp[0]).to(torch.float32).to(device)
     action_set=torch.stack(nexp[1]).to(torch.float32).to(device)
-    
-
     reward_set=nexp[2]
+    old_policies=torch.stack(nexp[3]).to(torch.float32).to(device)
+    old_values=torch.stack(nexp[4]).to(torch.float32).to(device)
     
    
-    # model.eval()
-
-      
-    old_policies,old_values=model(status_set)
-    
-    old_policies = old_policies.detach()
-    
-    
-   
-    values=old_values.detach()
-    
-    
     returns,advantages   =get_advantage(torch.tensor(reward_set), old_values.cpu())
     
     advantages=advantages.to(torch.float32).to(device).detach()
@@ -195,3 +178,8 @@ for s in range(10000):
         loss.backward()
         optimizer.step()
    
+    
+
+
+    
+         
