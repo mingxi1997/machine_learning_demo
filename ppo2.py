@@ -12,13 +12,13 @@ class AC(nn.Module):
     
     def __init__(self):
         super().__init__()
-        self.fc= nn.Sequential(nn.Linear(4, 128),
+        self.fc= nn.Sequential(nn.Linear(status_nums, 128),
                                 nn.ReLU(),
                                 nn.Linear(128, 128),
                                
                                  )
         
-        self.actor=nn.Linear(128,2)
+        self.actor=nn.Linear(128,action_nums)
         self.critic=nn.Linear(128,1)
                
         for m in self.modules():
@@ -43,7 +43,8 @@ def sample(status_set, action_set, returns, advantages, old_policies,old_values)
 
 
 device=torch.device('cuda:0')
-     
+status_nums=4
+action_nums=2
 model=AC().to(device)
 
 env = gym.make('CartPole-v0')
@@ -57,7 +58,7 @@ running_score=0
 epsilon_clip=0.1
 ciritic_coefficient = 0.5
 entropy_coefficient = 0.01
-ppo_epoch=10
+ppo_epoch=30
 writer=SummaryWriter()
 
 def get_advantage(rewards,values):
@@ -84,8 +85,8 @@ def get_advantage(rewards,values):
              advantages[t]=running_tderror[t]+(gamma * lambda_gae)*advantages[t+1]
     returns=advantages+values
     
-    # returns=(returns-returns.mean())/returns.std()
-    # advantages=(advantages-advantages.mean())/advantages.std()
+    returns=(returns-returns.mean())/returns.std()
+    advantages=(advantages-advantages.mean())/advantages.std()
     return returns,advantages
 
 
@@ -144,9 +145,6 @@ for s in range(1000):
         exp.append(experience)
     
                 
-                        
-
-            
         
     print('step :{} score:{}'.format(s,c))
     score=c
@@ -194,18 +192,14 @@ for s in range(1000):
 
         npolicy,nvalues=model(status_set)
     
-        critic_loss = (returns - nvalues.squeeze()).pow(2).sum()
+        critic_loss = (returns - nvalues.squeeze()).pow(2).mean()
     
     
         ratios = ((npolicy / old_policies) * action_set).sum(dim=1)
         clipped_ratios = torch.clamp(ratios, min=1.0-epsilon_clip, max=1.0+epsilon_clip).squeeze(0)
-        actor_loss = -torch.min(ratios*advantages ,clipped_ratios*advantages ).sum()
-    
-        
+        actor_loss = -torch.min(ratios*advantages ,clipped_ratios*advantages ).mean()
         policy_entropy = (torch.log(npolicy) * npolicy).sum(1, keepdim=True).mean()
-    
         loss = actor_loss + 0.5*critic_loss - 0.01* policy_entropy
-        
         optimizer.zero_grad()
 
         
@@ -217,15 +211,5 @@ for s in range(1000):
     
 
 
-    
-         
-    
-
-
-        
-    
-    
-    
-    
     
          
