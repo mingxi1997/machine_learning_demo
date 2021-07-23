@@ -88,20 +88,15 @@ def choose_action(status):
     with torch.no_grad():
         x=torch.tensor(status).to(torch.float32).to(device)
         policy,value=model(x)
-       
         dist=torch.distributions.Categorical(policy)
-        
-            
         action=int(dist.sample().item())
-        
-    
         return action,value,policy
  
 
 
 
 for s in range(10000):
-    # epsilon_clip*=0.99
+  
     exp=[]
     
     
@@ -144,25 +139,26 @@ for s in range(10000):
     writer.add_scalar('c',c,s)
     writer.add_scalar('running_score',running_score,s)
   
+            
+   
+    
     nexp=list(zip(*exp))
+    
    
     status_set=torch.tensor(nexp[0]).to(torch.float32).to(device)
     action_set=torch.stack(nexp[1]).to(torch.float32).to(device)
-    reward_set=nexp[2]
+    reward_set=torch.tensor(nexp[2]).to(torch.float32).to(device)
     old_policies=torch.stack(nexp[3]).to(torch.float32).to(device)
     old_values=torch.stack(nexp[4]).to(torch.float32).to(device)
     
    
-    returns,advantages   =get_advantage(torch.tensor(reward_set), old_values.cpu())
+    returns,advantages =get_advantage(reward_set, old_values)
     
-    advantages=advantages.to(torch.float32).to(device).detach()
-    returns=returns.to(torch.float32).to(device).detach()
-
-
+  
 
     for _ in range(ppo_epoch):
   
-        # model.train()
+       
 
         npolicy,nvalues=model(status_set)
     
@@ -179,7 +175,3 @@ for s in range(10000):
         optimizer.step()
    
     
-
-
-    
-         
