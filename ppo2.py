@@ -165,7 +165,7 @@ for s in range(1000):
     reward_set=nexp[2]
     
    
-    model.eval()
+    # model.eval()
 
       
     old_policies,old_values=model(status_set)
@@ -187,7 +187,7 @@ for s in range(1000):
 
     for _ in range(ppo_epoch):
   
-        model.train()
+        # model.train()
 
         npolicy,nvalues=model(status_set)
     
@@ -202,9 +202,3 @@ for s in range(1000):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-   
-    
-
-
-    
-         
