@@ -35,11 +35,11 @@ class AC(nn.Module):
         return a,c
     
     
-def sample(status_set, action_set, returns, advantages, old_policies,old_values):
+def shuffle_and_sample(status_set, action_set, returns, advantages, old_policies):
     
     
     index=random.sample(list(range(len(status_set))),int(len(status_set)))
-    return status_set[index], action_set[index], returns[index], advantages[index], old_policies[index],old_values[index]
+    return status_set[index], action_set[index], returns[index], advantages[index], old_policies[index]
 
 
 device=torch.device('cuda:0')
@@ -130,14 +130,13 @@ for s in range(1000):
         action_one_hot[action] = 1
 
         experience.append(action_one_hot)
-        # experience.append(policy)
+      
         status,reward,done,_=env.step(action)
 
         if done:
             reward=-1.
             
             
-        # experience.append(status)
 
         experience.append(reward)
         
@@ -182,13 +181,13 @@ for s in range(1000):
     
     advantages=advantages.to(torch.float32).to(device).detach()
     returns=returns.to(torch.float32).to(device).detach()
-    status_set, action_set, returns, advantages, old_policies,old_values=sample(status_set, action_set, returns, advantages, old_policies,old_values)
+    status_set, action_set, returns, advantages, old_policies=shuffle_and_sample(status_set, action_set, returns, advantages, old_policies)
 
     # print(epsilon_clip)
 
     for _ in range(ppo_epoch):
   
-        # model.train()
+        model.train()
 
         npolicy,nvalues=model(status_set)
     
@@ -201,11 +200,7 @@ for s in range(1000):
         policy_entropy = (torch.log(npolicy) * npolicy).sum(1, keepdim=True).mean()
         loss = actor_loss + 0.5*critic_loss - 0.01* policy_entropy
         optimizer.zero_grad()
-
-        
         loss.backward()
-        
-
         optimizer.step()
    
     
