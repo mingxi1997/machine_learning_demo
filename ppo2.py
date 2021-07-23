@@ -34,13 +34,6 @@ class AC(nn.Module):
      
         return a,c
     
-    
-def shuffle_and_sample(status_set, action_set, returns, advantages, old_policies):
-    
-    
-    index=random.sample(list(range(len(status_set))),int(len(status_set)))
-    return status_set[index], action_set[index], returns[index], advantages[index], old_policies[index]
-
 
 device=torch.device('cuda:0')
 status_nums=4
@@ -109,7 +102,7 @@ def choose_action(status):
 
 
 
-for s in range(1000):
+for s in range(10000):
     # epsilon_clip*=0.99
     exp=[]
     
@@ -181,9 +174,8 @@ for s in range(1000):
     
     advantages=advantages.to(torch.float32).to(device).detach()
     returns=returns.to(torch.float32).to(device).detach()
-    status_set, action_set, returns, advantages, old_policies=shuffle_and_sample(status_set, action_set, returns, advantages, old_policies)
 
-    # print(epsilon_clip)
+
 
     for _ in range(ppo_epoch):
   
@@ -202,3 +194,4 @@ for s in range(1000):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+   
