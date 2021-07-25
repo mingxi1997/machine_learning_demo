@@ -1,12 +1,7 @@
 import gym
-import random
 import torch
 import torch.nn as nn
-import numpy as np
 from tensorboardX import SummaryWriter
-
-
-
 
 class AC(nn.Module):
     
@@ -39,7 +34,6 @@ device=torch.device('cuda:0')
 status_nums=4
 action_nums=2
 model=AC().to(device)
-
 env = gym.make('CartPole-v0')
 env._max_episode_steps = 2000
 status = env.reset()
@@ -47,40 +41,37 @@ gamma = 0.99
 lambda_gae = 0.96
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 running_score=0
-
 epsilon_clip=0.1
 ciritic_coefficient = 0.5
 entropy_coefficient = 0.01
 ppo_epoch=30
 writer=SummaryWriter()
-
+max_grad_norm=0.5
 def get_advantage(rewards,values):
-    
-    values=values.squeeze()
 
+
+    assert old_values.dim()==1
+    assert rewards.dim()==1
         
         
     running_tderror=torch.zeros_like(rewards)
+    advantages= torch.zeros_like(rewards)
+
        
     for t in reversed(range(len(rewards))):
          if t==len(rewards)-1:
             running_tderror[t]=rewards[t]-values[t]
+            advantages[t]=running_tderror[t]
+           
          else:
              running_tderror[t]=rewards[t]+gamma*values[t+1]-values[t]
-             
-             
-    advantages=    torch.zeros_like(rewards)
-       
-    for t in reversed(range(len(rewards))):
-         if t==len(rewards)-1:
-            advantages[t]=running_tderror[t]
-         else:
              advantages[t]=running_tderror[t]+(gamma * lambda_gae)*advantages[t+1]
+             
     returns=advantages+values
-    
     returns=(returns-returns.mean())/returns.std()
     advantages=(advantages-advantages.mean())/advantages.std()
     return returns,advantages
+
 
 
 def choose_action(status):
@@ -122,8 +113,6 @@ for s in range(10000):
         if done:
             reward=-1.
             
-            
-
         experience.append(reward)
         experience.append(policy)
         experience.append(value)
@@ -149,7 +138,7 @@ for s in range(10000):
     action_set=torch.stack(nexp[1]).to(torch.float32).to(device)
     reward_set=torch.tensor(nexp[2]).to(torch.float32).to(device)
     old_policies=torch.stack(nexp[3]).to(torch.float32).to(device)
-    old_values=torch.stack(nexp[4]).to(torch.float32).to(device)
+    old_values=torch.stack(nexp[4]).to(torch.float32).to(device).squeeze()
     
    
     returns,advantages =get_advantage(reward_set, old_values)
@@ -172,6 +161,12 @@ for s in range(10000):
         loss = actor_loss + 0.5*critic_loss - 0.01* policy_entropy
         optimizer.zero_grad()
         loss.backward()
+        nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+
         optimizer.step()
    
     
+
+
+    
+         
