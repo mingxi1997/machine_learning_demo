@@ -23,7 +23,6 @@ class AC(nn.Module):
                 
     def forward(self,x):
         out=self.fc(x)
-       
         a=torch.nn.Softmax(dim=-1)(self.actor(torch.relu(out)))
         c=self.critic(torch.relu(out))
      
@@ -47,6 +46,10 @@ entropy_coefficient = 0.01
 ppo_epoch=30
 writer=SummaryWriter()
 max_grad_norm=0.5
+
+
+num_workers=5
+
 def get_advantage(rewards,values):
 
 
@@ -87,62 +90,82 @@ def choose_action(status):
 
 
 for s in range(10000):
-  
-    exp=[]
-    
-    
-    done=False
-    status = env.reset()  
+        
+   
+    returns=torch.tensor([]).to(device)
+    advantages=torch.tensor([]).to(device)
+    status_set=torch.tensor([]).to(device)
+    action_set=torch.tensor([]).to(device)
+    old_policies=torch.tensor([]).to(device)
+    old_values=torch.tensor([]).to(device)
+    advantages=torch.tensor([]).to(device)
     c=0
-    while not done:
-        c+=1
-        
-        
-        experience=[]
-        experience.append(status)
-  
-        action,value,policy=choose_action(status)
-        
-        action_one_hot = torch.zeros(2)
-        action_one_hot[action] = 1
-
-        experience.append(action_one_hot)
-      
-        status,reward,done,_=env.step(action)
-
-        if done:
-            reward=-1.
-            
-        experience.append(reward)
-        experience.append(policy)
-        experience.append(value)
-
-        exp.append(experience)
+    for _ in range(num_workers):
     
+        exp=[]
+        done=False
+        status = env.reset()  
+        
+        while not done:
+            c+=1
+            
+            
+            experience=[]
+            experience.append(status)
+      
+            action,value,policy=choose_action(status)
+            
+            action_one_hot = torch.zeros(2)
+            action_one_hot[action] = 1
+    
+            experience.append(action_one_hot)
+          
+            status,reward,done,_=env.step(action)
+    
+            if done:
+                reward=-1.
+                
+            experience.append(reward)
+            experience.append(policy)
+            experience.append(value)
+            exp.append(experience)
+        
                 
         
-    print('step :{} score:{}'.format(s,c))
-    score=c
+       
+        
+      
+                
+       
+        
+        nexp=list(zip(*exp))
+        
+       
+        status_set_=torch.tensor(nexp[0]).to(torch.float32).to(device)
+        action_set_=torch.stack(nexp[1]).to(torch.float32).to(device)
+        reward_set_=torch.tensor(nexp[2]).to(torch.float32).to(device)
+        old_policies_=torch.stack(nexp[3]).to(torch.float32).to(device)
+        old_values_=torch.stack(nexp[4]).to(torch.float32).to(device).squeeze()
+        
+       
+        returns_,advantages_ =get_advantage(reward_set_, old_values_)
+    
+        returns=torch.cat((returns,returns_),dim=0)
+        advantages=torch.cat((advantages,advantages_),dim=0)
+        status_set=torch.cat((status_set,status_set_),dim=0)
+        action_set=torch.cat((action_set,action_set_),dim=0)
+        old_policies=torch.cat((old_policies,old_policies_),dim=0)
+        old_values=torch.cat((old_values,old_values_),dim=0)
+        
+    score=c/num_workers
     running_score = 0.99 * running_score + 0.01 * score
-    print(running_score)
+    print('epoch :{} score :{} running_score: {}'.format(s,score,running_score))
+    
     writer.add_scalar('c',c,s)
     writer.add_scalar('running_score',running_score,s)
-  
-            
    
-    
-    nexp=list(zip(*exp))
-    
-   
-    status_set=torch.tensor(nexp[0]).to(torch.float32).to(device)
-    action_set=torch.stack(nexp[1]).to(torch.float32).to(device)
-    reward_set=torch.tensor(nexp[2]).to(torch.float32).to(device)
-    old_policies=torch.stack(nexp[3]).to(torch.float32).to(device)
-    old_values=torch.stack(nexp[4]).to(torch.float32).to(device).squeeze()
-    
-   
-    returns,advantages =get_advantage(reward_set, old_values)
-    
+       
+        
   
 
     for _ in range(ppo_epoch):
@@ -161,7 +184,7 @@ for s in range(10000):
         loss = actor_loss + 0.5*critic_loss - 0.01* policy_entropy
         optimizer.zero_grad()
         loss.backward()
-        nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+        # nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
 
         optimizer.step()
    
