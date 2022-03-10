@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask,session
 from flask.globals import request
 from flask.json import jsonify
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
@@ -18,7 +18,7 @@ def create_token(api_user):
     
     #第一个参数是内部的私钥，这里写在共用的配置信息里了，如果只是测试可以写死
     #第二个参数是有效期(秒)
-    s = Serializer(app.config["SECRET_KEY"],expires_in=100)
+    s = Serializer(app.config["SECRET_KEY"],expires_in=36000)
     #接收用户id转换与编码
     token = s.dumps({"id":api_user}).decode("ascii")
     return token
@@ -43,7 +43,11 @@ def login_required(view_func):
         return view_func(*args,**kwargs)
 
     return verify_token
+
+
 '''
+
+
 @app.before_request
 def login_required():
     if request.path not in NOT_CHECK_URL:
@@ -54,6 +58,7 @@ def login_required():
         s = Serializer(app.config["SECRET_KEY"])
         try:
             s.loads(token)
+
         except:
             return jsonify(msg = "can not compute token")
 @app.route('/login',methods=["POST"])
@@ -61,6 +66,7 @@ def info():
     '''
     POST携带userid来换取token
     代码省略其他逻辑
+    
     '''
     return jsonify({'token':create_token(api_user=request.args.getlist('user_id'))})
 
@@ -69,6 +75,9 @@ def index():
     '''
     携带token登陆
     '''
-    return jsonify(msg='allow you come')
+    token = request.headers["token"]
+    s = Serializer(app.config["SECRET_KEY"])
+    data=s.loads(token)
+    return jsonify({'name':str(data)})
 if __name__ == "__main__":
     app.run()
