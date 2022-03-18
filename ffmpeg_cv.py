@@ -4,9 +4,7 @@ import cv2
 import time
 class ffmpeg_writer:
     def __init__(self,rtmpUrl,fps,width,height):
-        # ffmpeg command
         
-        # ffmpeg -i "rtsp://admin:123@localhost:554/cam/realmonitor?channel=1&subtype=0" -vcodec libx264 -vprofile baseline -acodec libmp3lame -ar 44100 -ac 1 -f flv rtmp://localhost:1935/hls/movie
 
 
         command = ['ffmpeg',
