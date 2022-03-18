@@ -1,10 +1,14 @@
 from os import write
 import subprocess as sp
 import cv2 
-
+import time
 class ffmpeg_writer:
     def __init__(self,rtmpUrl,fps,width,height):
         # ffmpeg command
+        
+        # ffmpeg -i "rtsp://admin:123@localhost:554/cam/realmonitor?channel=1&subtype=0" -vcodec libx264 -vprofile baseline -acodec libmp3lame -ar 44100 -ac 1 -f flv rtmp://localhost:1935/hls/movie
+
+
         command = ['ffmpeg',
                 '-y',
                 '-f', 'rawvideo',
@@ -29,7 +33,10 @@ class ffmpeg_writer:
 
 if __name__ == '__main__':
     rtmpUrl = "rtmp://36.152.9.59:39935/live/0?secret=1443ffb0-2f5b-4c85-ad33-55ccfe67c2f1"
-    camera_path = "rtsp://192.168.0.69:554/user=admin&password=&channel=1&stream=0.sdp?"
+    # hls_url = "http://36.152.9.59:39980/live/0/hls.m3u8?secret=1443ffb0-2f5b-4c85-ad33-55ccfe67c2f1"
+
+    camera_path = "rtsp://admin:qw123456@192.168.0.3:554/h264/channel/ch1/main/av_stream"
+
     cap = cv2.VideoCapture(camera_path)
 
     # Get video information
@@ -44,18 +51,21 @@ if __name__ == '__main__':
             
     # read webcamera
     while(cap.isOpened()):
-        ret, frame = cap.read()
+        try:
+            ret, frame = cap.read()
         
-        frame=cv2.resize(frame,(1024,768))
-        if not ret:
-            print("Opening camera is failed")
-            break
-                
-        # process frame
-        # your code
-        # process frame
-    
-        # write to pipe
-        writer.write(frame)
+            frame2=cv2.resize(frame,(1024,768))
+            # if not ret:
+            #     print("Opening camera is failed")
+            #     break
+                    
+            # process frame
+            # your code
+            # process frame
+        
+            # write to pipe
+            writer.write(frame2)
+        except:
+            time.sleep(0.5)
     
     writer.release()
